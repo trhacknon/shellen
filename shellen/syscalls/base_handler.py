@@ -23,7 +23,7 @@ class SysHandler:
     def __init__(self):
         self.tables         = {}
         self.req_similarity = 0.75
-
+        self._args_order = {}
         self.tcache = {}
 
     def get_printable_table(self, arch, pattern, colored=False, verbose=False):
@@ -44,8 +44,11 @@ class SysHandler:
         if len(rawtable) == 0:
             return None
 
-        used_hd = self.__fetch_used_headers(rawtable, verbose)
-        table   = [self.__make_colored_row(used_hd, 'yellow,bold', upper=True) if colored else used_hd]
+        used_hd = self.__fetch_used_headers(rawtable, arch, verbose)
+        table = [
+            self.__make_colored_row(used_hd, 'yellow,bold', upper=True)
+            if colored else used_hd
+        ]
 
         for command in rawtable:
             cur_tb_field = []
@@ -76,12 +79,17 @@ class SysHandler:
 
     def __make_colored_row(self, row, pcolor, upper=False):
         return [make_colors('<{}>{}</>'.format(pcolor, val.upper() if upper else val)) for val in row]
+    def __fetch_used_headers(self, table, arch, verbose=False):
+        args_order = self._args_order.get(arch, [])
 
-    def __fetch_used_headers(self, table, verbose=False):
         def hdkey(hd):
-            return -len(hd), hd.upper()
+            hd_up = hd.upper()
+
+            return (args_order.index(hd_up) if hd_up in args_order else -1,
+                    -len(hd), hd_up)
 
         used_hd = set()
+
         for command in table:
             for header, value in command.items():
                 if value != EMPTY_VALUE:
@@ -89,7 +97,9 @@ class SysHandler:
         used_hd.remove(NAME_FIELD)
         used_hd.remove(DEF_FIELD)
         used_hd.remove(ID_FIELD)
-        return [NAME_FIELD] + sorted(list(used_hd), key=hdkey) + ([DEF_FIELD] if verbose else [])
+
+        return ([NAME_FIELD] + sorted(used_hd, key=hdkey) +
+                ([DEF_FIELD] if verbose else []))
 
     def search(self, arch, pattern):
         try:
